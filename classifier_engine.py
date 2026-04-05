@@ -1,55 +1,56 @@
 import pandas as pd
 import math
 
-def get_tresholds(df,target='target'):
+def get_tresholds(X):
     """
     Разбиение на уникальные значение признаков (средние значения между уникальными)
     """
     cols = {}
-    for col in df.columns: 
-        if col == target:continue
-        values = sorted(df[col].unique())
+    for col in X.columns: 
+        values = sorted(X[col].unique())
         mids = [(values[i] + values[i+1])/2 for i in range(len(values) - 1)]
         cols[col] = mids
     return cols
 
-def entropy(df,target):
+def entropy(y):
     """
-    Подсчёт энтропии - функции ошибки для классификации в df по target
+    Подсчёт энтропии - функции ошибки для классификации по y
     """
-    counts = df[target].value_counts(normalize=True)
+    counts = pd.Series(y).value_counts(normalize=True)
     ent = 0
     for p in counts:
         if p > 0:
             ent -= p * math.log2(p)
     return ent
 
-def info_gain(left,right,current_entropy,target):
+def info_gain(y,y_left,y_right):
     """
     Подсчёт прироста информации
     """
-    p = len(left)/(len(left)+len(right))
-    return current_entropy - p*entropy(left,target) - (1-p) * entropy(right,target)
+    if len(y) == 0: return 0
+    p = len(y_left) / len(y)
+    return entropy(y) - p * entropy(y_left) - (1 - p) * entropy(y_right)
 
-def get_best_split(df,target):
+def get_best_split(X, y):
     """
     Нахождение лучшего разбиения
     """
-    cols = get_tresholds(df,target)
+    cols = get_tresholds(X)
     best_gain = 0
     best_question = None
-    current_entropy = entropy(df,target)
+    current_entropy = entropy(y)
     for feature in cols:
         for value in cols[feature]:
-            left = df[df[feature] < value]
-            right = df[~(df[feature] < value)]
+            y_left = y[X[feature] < value]
+            y_right = y[~(X[feature] < value)]
 
-            if len(left) == 0 or len(right) == 0:
+            if len(y_left) == 0 or len(y_right) == 0:
                 continue
             
-            gain = info_gain(left,right,current_entropy,target)
+            gain = info_gain(y,y_left,y_right)
 
-            if gain > best_gain:
+            if gain >= best_gain:
                 best_gain = gain
                 best_question = (feature,value)
+    if best_gain == 0: return None
     return best_question
