@@ -1,10 +1,11 @@
 import pandas as pd
-from classifier_engine import entropy, get_best_split
+from classifier_engine import impurity, get_best_split
 
 class ClassifierTree:
-    def __init__(self, max_depth=5, min_samples_split=2):
+    def __init__(self, max_depth=5, min_samples_split=2, criterion='entropy'):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
+        self.criterion = criterion  # 'entropy' или 'gini'
         self.tree_ = None
 
     def fit(self, X, y):
@@ -13,13 +14,13 @@ class ClassifierTree:
         self.tree_ = self._build_tree(X_df, y_ser, depth=0)
         return self
     
-    def _build_tree(self, X, y,depth):
-        cur_entropy = entropy(y)
+    def _build_tree(self, X, y, depth):
+        cur_impurity = impurity(y, self.criterion)
 
-        if (cur_entropy == 0) or (depth >= self.max_depth) or (len(y) < self.min_samples_split):
-            return {"label":y.mode().iloc[0]}
+        if (cur_impurity == 0) or (depth >= self.max_depth) or (len(y) < self.min_samples_split):
+            return {"label": y.mode().iloc[0]}
         
-        best_split = get_best_split(X,y)
+        best_split = get_best_split(X, y, self.criterion)
 
         if not best_split:
             return {"label": y.mode().iloc[0]}
@@ -30,8 +31,8 @@ class ClassifierTree:
         return {
             "feature": feature,
             "value": value,
-            "left": self._build_tree(X[mask], y[mask], depth+1),
-            "right": self._build_tree(X[~mask], y[~mask], depth+1)
+            "left": self._build_tree(X[mask], y[mask], depth + 1),
+            "right": self._build_tree(X[~mask], y[~mask], depth + 1)
         }
         
     def predict(self, X):
@@ -39,11 +40,9 @@ class ClassifierTree:
         def _get_pred(row, node):
             if "label" in node:
                 return node["label"]
-            
             if float(row[node["feature"]]) < float(node["value"]):
                 return _get_pred(row, node["left"])
             else:
                 return _get_pred(row, node["right"])
         
         return X.apply(lambda row: _get_pred(row, self.tree_), axis=1).values
-    
